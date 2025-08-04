@@ -17,7 +17,7 @@ if uploaded_file:
     desired_columns = [
         "Warehouse_Code", "Warehouse_Name", "State", "Region", "Location", "CM_Name",
         "Customer_Name", "WHR/SR/ISIN_No", "Commodity_Name", "Commodity_Variety",
-        "Balance_No_of_Bags", "OS_Quantit(MT)", "Warehouse_Type", "CM_Location_Name", "Auditor"
+        "Balance_No_of_Bags", "OS_Quantit(MT)","Warehouse_Address", "Warehouse_Type", "CM_Location_Name", "Auditor"
     ]
 
     # Show dropdowns to map uploaded columns to desired format
