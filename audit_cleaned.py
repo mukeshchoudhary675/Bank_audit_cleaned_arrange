@@ -2,53 +2,64 @@ import streamlit as st
 import pandas as pd
 import io
 
-st.title("📊 Flexible Excel Cleaner + State-wise Splitter")
+st.set_page_config(page_title="State Splitter + Audit Tracking", layout="wide")
+st.title("📊 Excel Cleaner with State-wise Sheets + Audit Tracking")
 
-uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
+uploaded_file = st.file_uploader("📁 Upload your Excel file", type=["xlsx"])
 
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
-    st.success("✅ File uploaded successfully!")
+    st.success(f"✅ File uploaded. It has {df.shape[0]} rows and {df.shape[1]} columns.")
 
-    st.subheader("🔗 Map Your Columns")
+    st.subheader("🔗 Map Columns to Your Desired Structure")
 
-    # Desired final column structure
+    # Final desired columns (15)
     desired_columns = [
         "Warehouse_Code", "Warehouse_Name", "State", "Region", "Location", "CM_Name",
         "Customer_Name", "WHR/SR/ISIN_No", "Commodity_Name", "Commodity_Variety",
-        "Balance_No_of_Bags", "OS_Quantit(MT)","Warehouse_Address", "Warehouse_Type", "CM_Location_Name", "Auditor"
+        "Balance_No_of_Bags", "OS_Quantit(MT)", "Warehouse_Type", "CM_Location_Name", "Auditor"
     ]
 
-    # Create a mapping from desired columns to actual columns
+    # Show dropdowns to map uploaded columns to desired format
     mapping = {}
     col1, col2 = st.columns(2)
     with col1:
-        for col in desired_columns[:len(desired_columns)//2]:
-            mapping[col] = st.selectbox(f"Select for **{col}**", df.columns, key=col)
+        for col in desired_columns[:len(desired_columns) // 2]:
+            mapping[col] = st.selectbox(f"Select column for: **{col}**", df.columns, key=col)
     with col2:
-        for col in desired_columns[len(desired_columns)//2:]:
-            mapping[col] = st.selectbox(f"Select for **{col}**", df.columns, key=col)
+        for col in desired_columns[len(desired_columns) // 2:]:
+            mapping[col] = st.selectbox(f"Select column for: **{col}**", df.columns, key=col)
 
-    if st.button("🔄 Process and Split by State"):
+    if st.button("🔄 Process and Generate Excel"):
         try:
-            # Rename and reorder columns
+            # Step 1: Reorder and rename columns
             selected_df = df[[mapping[col] for col in desired_columns]]
-            selected_df.columns = desired_columns  # Rename columns to standard names
+            selected_df.columns = desired_columns
 
-            # Write to Excel with each State as a sheet
+            # Step 2: Build "Audit Tracking" sheet
+            audit_cols = [
+                "Warehouse_Code", "Warehouse_Name", "State", "Region", "CM_Name", "Location"
+            ]
+            audit_df = selected_df[audit_cols].drop_duplicates(subset=["Warehouse_Code"])
+            audit_df.insert(0, "Sr No.", range(1, len(audit_df) + 1))
+
+            # Step 3: Export everything to Excel
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                # First sheet: Audit Tracking
+                audit_df.to_excel(writer, sheet_name="Audit Tracking", index=False)
+
+                # State-wise sheets
                 for state, group in selected_df.groupby("State"):
                     sheet_name = str(state)[:31] if pd.notna(state) else "Unknown"
                     group.to_excel(writer, sheet_name=sheet_name, index=False)
 
-
             st.success("✅ File processed successfully!")
 
             st.download_button(
-                label="📥 Download State-wise Excel",
+                label="📥 Download Final Excel",
                 data=output.getvalue(),
-                file_name="state_wise_output.xlsx",
+                file_name="statewise_with_audit_tracking.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
