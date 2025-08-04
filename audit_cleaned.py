@@ -39,8 +39,8 @@ if uploaded_file:
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 for state, group in selected_df.groupby("State"):
-                sheet_name = str(state)[:31] if pd.notna(state) else "Unknown"
-                group.to_excel(writer, sheet_name=sheet_name, index=False)
+                    sheet_name = str(state)[:31] if pd.notna(state) else "Unknown"
+                    group.to_excel(writer, sheet_name=sheet_name, index=False)
 
 
             st.success("✅ File processed successfully!")
