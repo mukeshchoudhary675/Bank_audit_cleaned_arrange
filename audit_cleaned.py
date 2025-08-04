@@ -2,35 +2,45 @@ import streamlit as st
 import pandas as pd
 import io
 
-# Desired column order
-desired_columns = [
-    "Warehouse_Code", "Warehouse_Name", "State", "Region", "Location", "CM_Name",
-    "Customer_Name", "WHR/SR/ISIN_No", "Commodity_Name", "Commodity_Variety",
-    "Balance_No_of_Bags", "OS_Quantit(MT)", "Warehouse_Type", "CM_Location_Name", "Auditor"
-]
+st.title("📊 Flexible Excel Cleaner + State-wise Splitter")
 
-st.title("🧾 State-wise Excel Cleaner & Splitter")
-
-uploaded_file = st.file_uploader("Upload Raw Excel File", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
 if uploaded_file:
-    try:
-        df = pd.read_excel(uploaded_file)
+    df = pd.read_excel(uploaded_file)
+    st.success("✅ File uploaded successfully!")
 
-        # Check for missing columns
-        missing_cols = [col for col in desired_columns if col not in df.columns]
-        if missing_cols:
-            st.error(f"These columns are missing in uploaded file: {missing_cols}")
-        else:
-            # Reorder columns
-            df = df[desired_columns]
+    st.subheader("🔗 Map Your Columns")
 
-            # Group by 'State' and write each group to a sheet
+    # Desired final column structure
+    desired_columns = [
+        "Warehouse_Code", "Warehouse_Name", "State", "Region", "Location", "CM_Name",
+        "Customer_Name", "WHR/SR/ISIN_No", "Commodity_Name", "Commodity_Variety",
+        "Balance_No_of_Bags", "OS_Quantit(MT)","Warehouse_Address", "Warehouse_Type", "CM_Location_Name", "Auditor"
+    ]
+
+    # Create a mapping from desired columns to actual columns
+    mapping = {}
+    col1, col2 = st.columns(2)
+    with col1:
+        for col in desired_columns[:len(desired_columns)//2]:
+            mapping[col] = st.selectbox(f"Select for **{col}**", df.columns, key=col)
+    with col2:
+        for col in desired_columns[len(desired_columns)//2:]:
+            mapping[col] = st.selectbox(f"Select for **{col}**", df.columns, key=col)
+
+    if st.button("🔄 Process and Split by State"):
+        try:
+            # Rename and reorder columns
+            selected_df = df[[mapping[col] for col in desired_columns]]
+            selected_df.columns = desired_columns  # Rename columns to standard names
+
+            # Write to Excel with each State as a sheet
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                for state, group in df.groupby('State'):
-                    safe_state = str(state)[:31]  # Sheet name max length
-                    group.to_excel(writer, sheet_name=safe_state, index=False)
+                for state, group in selected_df.groupby("State"):
+                    sheet_name = str(state)[:31] if pd.notna(state) else "Unknown"
+                    group.to_excel(writer, sheet_name=sheet_name, index=False)
                 writer.save()
 
             st.success("✅ File processed successfully!")
@@ -42,5 +52,5 @@ if uploaded_file:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-    except Exception as e:
-        st.error(f"❌ Error: {e}")
+        except Exception as e:
+            st.error(f"❌ Error while processing: {e}")
