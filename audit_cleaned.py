@@ -2,64 +2,71 @@ import streamlit as st
 import pandas as pd
 import io
 
-st.set_page_config(page_title="State Splitter + Audit Tracking", layout="wide")
-st.title("📊 Excel Cleaner with State-wise Sheets + Audit Tracking")
+st.set_page_config(page_title="Dynamic Excel Processor", layout="wide")
+st.title("📊 Dynamic Excel Cleaner with Audit Tracking + Optional State Split")
 
 uploaded_file = st.file_uploader("📁 Upload your Excel file", type=["xlsx"])
 
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
-    st.success(f"✅ File uploaded. It has {df.shape[0]} rows and {df.shape[1]} columns.")
+    all_columns = df.columns.tolist()
 
-    st.subheader("🔗 Map Columns to Your Desired Structure")
+    st.success(f"✅ Uploaded successfully. File has {df.shape[0]} rows and {df.shape[1]} columns.")
 
-    # Final desired columns (15)
-    desired_columns = [
-        "Warehouse_Code", "Warehouse_Name", "State", "Location", "CM_Name",
-        "Customer_Name", "WHR/SR/ISIN_No", "Commodity_Name", "Commodity_Variety","No_of_Bags",
-        "Balance_No_of_Bags","Avg","OS_Quantit(MT)", "Bal_OS_Quantit(MT)","Warehouse_Address", "Warehouse_Type", "CM_Location_Name"
-    ]
+    st.subheader("📌 Select Columns for Final Output")
+    selected_columns = st.multiselect(
+        "✅ Choose columns to include in the main cleaned file",
+        options=all_columns,
+        default=all_columns
+    )
 
-    # Show dropdowns to map uploaded columns to desired format
-    mapping = {}
-    col1, col2 = st.columns(2)
-    with col1:
-        for col in desired_columns[:len(desired_columns) // 2]:
-            mapping[col] = st.selectbox(f"Select column for: **{col}**", df.columns, key=col)
-    with col2:
-        for col in desired_columns[len(desired_columns) // 2:]:
-            mapping[col] = st.selectbox(f"Select column for: **{col}**", df.columns, key=col)
+    reorder_columns = st.multiselect(
+        "🧩 Reorder selected columns (drag to arrange)",
+        options=selected_columns,
+        default=selected_columns
+    )
+
+    st.subheader("🛠️ Select Columns for Audit Tracking Sheet")
+    audit_columns = st.multiselect(
+        "📋 Choose columns to include in the Audit Tracking sheet",
+        options=all_columns
+    )
+
+    state_column = st.selectbox(
+        "🌍 Select 'State' column if available (or leave blank)",
+        options=["None"] + all_columns,
+        index=0
+    )
 
     if st.button("🔄 Process and Generate Excel"):
         try:
-            # Step 1: Reorder and rename columns
-            selected_df = df[[mapping[col] for col in desired_columns]]
-            selected_df.columns = desired_columns
+            # --- Main cleaned dataframe
+            final_df = df[reorder_columns]
 
-            # Step 2: Build "Audit Tracking" sheet
-            audit_cols = [
-                "Warehouse_Code", "Warehouse_Name", "State", "Region", "CM_Name", "Location"
-            ]
-            audit_df = selected_df[audit_cols].drop_duplicates(subset=["Warehouse_Code"])
+            # --- Audit Tracking sheet
+            audit_df = df[audit_columns].drop_duplicates()
             audit_df.insert(0, "Sr No.", range(1, len(audit_df) + 1))
 
-            # Step 3: Export everything to Excel
+            # --- Write to Excel
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                # First sheet: Audit Tracking
+                # Sheet 1: Audit Tracking
                 audit_df.to_excel(writer, sheet_name="Audit Tracking", index=False)
 
-                # State-wise sheets
-                for state, group in selected_df.groupby("State"):
-                    sheet_name = str(state)[:31] if pd.notna(state) else "Unknown"
-                    group.to_excel(writer, sheet_name=sheet_name, index=False)
+                # State-wise or single output
+                if state_column != "None":
+                    for state, group in final_df.groupby(state_column):
+                        sheet_name = str(state)[:31] if pd.notna(state) else "Unknown"
+                        group.to_excel(writer, sheet_name=sheet_name, index=False)
+                else:
+                    final_df.to_excel(writer, sheet_name="Cleaned Data", index=False)
 
-            st.success("✅ File processed successfully!")
+            st.success("✅ Excel file is ready!")
 
             st.download_button(
-                label="📥 Download Final Excel",
+                label="📥 Download Excel File",
                 data=output.getvalue(),
-                file_name="statewise_with_audit_tracking.xlsx",
+                file_name="dynamic_output.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
